@@ -3244,6 +3244,12 @@ PNG_EXPORT(244, int, png_set_option, (png_structrp png_ptr, int option,
 //#ifdef __cplusplus
 //}
 //#endif
+
+// This copy of libpng doesn't contain support for hardware optimizations.
+#define PNG_ARM_NEON_OPT 0
+#define PNG_POWERPC_VSX_OPT 0
+#define PNG_INTEL_SSE_OPT 0
+#define PNG_MIPS_MSA_OPT 0
 // JUCE CHANGE ENDS HERE
 
 #endif /* PNG_VERSION_INFO_ONLY */
