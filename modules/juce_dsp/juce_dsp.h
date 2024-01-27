@@ -58,16 +58,16 @@
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_audio_formats/juce_audio_formats.h>
 
+#ifndef JUCE_USE_SIMD
+ #define JUCE_USE_SIMD 1
+#endif
+
 #if defined (_M_X64) || defined (__amd64__) || defined (__SSE2__) || (defined (_M_IX86_FP) && _M_IX86_FP == 2)
 
  #if defined (_M_X64) || defined (__amd64__)
   #ifndef __SSE2__
    #define __SSE2__
   #endif
- #endif
-
- #ifndef JUCE_USE_SIMD
-  #define JUCE_USE_SIMD 1
  #endif
 
  #if JUCE_USE_SIMD
@@ -78,18 +78,7 @@
 // which has a minimum requirement of armv7, which supports neon.
 #elif defined (__ARM_NEON__) || defined (__ARM_NEON) || defined (__arm64__) || defined (__aarch64__) || defined (_M_ARM) || defined (_M_ARM64)
 
- #ifndef JUCE_USE_SIMD
-  #define JUCE_USE_SIMD 1
- #endif
-
  #include <arm_neon.h>
-
-#else
-
- // No SIMD Support
- #ifndef JUCE_USE_SIMD
-  #define JUCE_USE_SIMD 0
- #endif
 
 #endif
 
@@ -233,8 +222,6 @@ namespace util
   #endif
  #elif JUCE_ARM
   #include "native/juce_SIMDNativeOps_neon.h"
- #else
-  #error "SIMD register support not implemented for this platform"
  #endif
 
  #include "containers/juce_SIMDRegister.h"
