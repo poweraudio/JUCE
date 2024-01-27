@@ -87,8 +87,6 @@
   #endif
  #elif JUCE_ARM
   #include "native/juce_SIMDNativeOps_neon.cpp"
- #else
-  #error "SIMD register support not implemented for this platform"
  #endif
 #endif
 
