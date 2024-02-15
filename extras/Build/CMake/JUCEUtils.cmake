@@ -405,6 +405,8 @@ function(juce_add_binary_data target)
 
     add_library(${target} STATIC)
 
+    set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE TRUE)
+
     set(juce_binary_data_folder "${CMAKE_CURRENT_BINARY_DIR}/juce_binarydata_${target}/JuceLibraryCode")
 
     set(binary_file_names)
@@ -1057,7 +1059,6 @@ function(juce_enable_vst3_manifest_step shared_code_target)
 
     # Use the helper tool to write out the moduleinfo.json
     add_custom_command(TARGET ${target_name} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E remove -f "${product}/Contents/moduleinfo.json"
         COMMAND ${CMAKE_COMMAND} -E make_directory "${product}/Contents/Resources"
         COMMAND juce_vst3_helper
             -create
@@ -1115,6 +1116,12 @@ function(_juce_set_plugin_target_properties shared_code_target kind)
         _juce_adhoc_sign(${target_name})
 
         get_target_property(vst3_auto_manifest ${shared_code_target} JUCE_VST3_AUTO_MANIFEST)
+
+        add_custom_command(TARGET ${target_name} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E echo "removing moduleinfo.json"
+            COMMAND ${CMAKE_COMMAND} -E remove -f
+                "${output_path}/Contents/moduleinfo.json"
+                "${output_path}/Contents/Resources/moduleinfo.json")
 
         if(vst3_auto_manifest)
             juce_enable_vst3_manifest_step(${shared_code_target})
