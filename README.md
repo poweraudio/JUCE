@@ -1,3 +1,19 @@
+**PowerAudio fork of JUCE**
+
+This fork of JUCE has the following changes:
+
+* Fixed linker errors on IBM Power related to undefined symbols in libpng (see
+  [JUCE#1339]).
+* Added a fallback implementation of `SIMDRegister` for platforms that don’t
+  have native SIMD support (see [JUCE#1342]).
+* Fixed VST 3 plugin generation on Power (see [JUCE#1344]).
+
+[JUCE#1339]: https://github.com/juce-framework/JUCE/pull/1339
+[JUCE#1342]: https://github.com/juce-framework/JUCE/pull/1342
+[JUCE#1344]: https://github.com/juce-framework/JUCE/pull/1344
+
+---
+
 ![alt text](https://assets.juce.com/juce/JUCE_banner_github.png "JUCE")
 
 JUCE is an open-source cross-platform C++ application framework for creating high quality
