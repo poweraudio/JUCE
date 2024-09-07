@@ -38,6 +38,11 @@
  #error To build JUCE VST3 plug-ins on BSD you must use an external BSD-compatible VST3 SDK with JUCE_CUSTOM_VST3_SDK=1
 #endif
 
+// It's important to include this *before* any of the Steinberg headers.
+// On Windows, the VST3 headers might end up defining `stricmp` as `_stricmp` before including
+// <cstring> or <string.h>, which prevents the use of stricmp in JUCE source.
+#include <cstring>
+
 // Wow, those Steinberg guys really don't worry too much about compiler warnings.
 JUCE_BEGIN_IGNORE_WARNINGS_LEVEL_MSVC (0, 4505 4702 6011 6031 6221 6386 6387 6330 6001 28199)
 
@@ -83,7 +88,8 @@ JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-W#warnings",
                                      "-Wunused-but-set-variable",
                                      "-Wunused-function",
                                      "-Wunused-parameter",
-                                     "-Wzero-as-null-pointer-constant")
+                                     "-Wzero-as-null-pointer-constant",
+                                     "-Wdangling-else")
 
 #undef DEVELOPMENT
 #define DEVELOPMENT 0  // This avoids a Clang warning in Steinberg code about unused values
@@ -157,10 +163,12 @@ JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-W#warnings",
   #include <base/source/flock.cpp>
  #endif
 
-#pragma push_macro ("True")
-#undef True
-#pragma push_macro ("False")
-#undef False
+ #pragma push_macro ("True")
+ #undef True
+ #pragma push_macro ("False")
+ #undef False
+
+ JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wmultichar", "-Wfour-char-constants")
 
  #include <base/source/updatehandler.cpp>
  #include <pluginterfaces/base/conststringtable.cpp>
@@ -171,11 +179,13 @@ JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-W#warnings",
  #include <pluginterfaces/gui/iplugviewcontentscalesupport.h>
  #include <pluginterfaces/vst/ivstchannelcontextinfo.h>
  #include <pluginterfaces/vst/ivstmidicontrollers.h>
+ #include <public.sdk/source/common/commonstringconvert.cpp>
  #include <public.sdk/source/common/memorystream.cpp>
  #include <public.sdk/source/common/pluginview.cpp>
  #include <public.sdk/source/vst/hosting/hostclasses.cpp>
  #include <public.sdk/source/vst/moduleinfo/moduleinfoparser.cpp>
  #include <public.sdk/source/vst/utility/stringconvert.cpp>
+ #include <public.sdk/source/vst/utility/vst2persistence.cpp>
  #include <public.sdk/source/vst/utility/uid.h>
  #include <public.sdk/source/vst/vstbus.cpp>
  #include <public.sdk/source/vst/vstcomponent.cpp>
@@ -185,8 +195,10 @@ JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-W#warnings",
  #include <public.sdk/source/vst/vstparameters.cpp>
  #include <public.sdk/source/vst/vstpresetfile.cpp>
 
-#pragma pop_macro ("True")
-#pragma pop_macro ("False")
+ JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+
+ #pragma pop_macro ("True")
+ #pragma pop_macro ("False")
 
  #if VST_VERSION >= 0x03060c   // 3.6.12
   #include <public.sdk/source/vst/hosting/pluginterfacesupport.cpp>
