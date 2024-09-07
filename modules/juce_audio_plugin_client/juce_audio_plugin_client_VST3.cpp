@@ -1,24 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE library.
-   Copyright (c) 2022 - Raw Material Software Limited
+   This file is part of the JUCE framework.
+   Copyright (c) Raw Material Software Limited
 
-   JUCE is an open source library subject to commercial or open-source
+   JUCE is an open source framework subject to commercial or open source
    licensing.
 
-   By using JUCE, you agree to the terms of both the JUCE 7 End-User License
-   Agreement and JUCE Privacy Policy.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   End User License Agreement: www.juce.com/juce-7-licence
-   Privacy Policy: www.juce.com/juce-privacy-policy
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-8-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
 
-   Or: You may also use this code under the terms of the GPL v3 (see
-   www.gnu.org/licenses).
+   Or:
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -801,19 +810,6 @@ public:
 
             updateParameterInfo();
 
-            info.stepCount = (Steinberg::int32) 0;
-
-           #if ! JUCE_FORCE_LEGACY_PARAMETER_AUTOMATION_TYPE
-            if (param.isDiscrete())
-           #endif
-            {
-                const int numSteps = param.getNumSteps();
-                info.stepCount = (Steinberg::int32) (numSteps > 0 && numSteps < 0x7fffffff ? numSteps - 1 : 0);
-            }
-
-            info.defaultNormalizedValue = param.getDefaultValue();
-            jassert (info.defaultNormalizedValue >= 0 && info.defaultNormalizedValue <= 1.0f);
-
             // Is this a meter?
             if ((((unsigned int) param.getCategory() & 0xffff0000) >> 16) == 2)
                 info.flags = Vst::ParameterInfo::kIsReadOnly;
@@ -837,9 +833,29 @@ public:
                 return true;
             };
 
-            auto anyUpdated = updateParamIfChanged (info.title,      param.getName (128));
-            anyUpdated     |= updateParamIfChanged (info.shortTitle, param.getName (8));
-            anyUpdated     |= updateParamIfChanged (info.units,      param.getLabel());
+            const auto updateParamIfScalarChanged = [] (auto& toChange, const auto newValue)
+            {
+                return ! exactlyEqual (std::exchange (toChange, newValue), newValue);
+            };
+
+            const auto newStepCount = [&]
+            {
+               #if ! JUCE_FORCE_LEGACY_PARAMETER_AUTOMATION_TYPE
+                if (! param.isDiscrete())
+                    return 0;
+               #endif
+
+                const auto numSteps = param.getNumSteps();
+                return (Steinberg::int32) (0 < numSteps && numSteps < 0x7fffffff ? numSteps - 1 : 0);
+            }();
+
+            auto anyUpdated = updateParamIfChanged (info.title, param.getName (128));
+            anyUpdated |= updateParamIfChanged (info.shortTitle, param.getName (8));
+            anyUpdated |= updateParamIfChanged (info.units, param.getLabel());
+            anyUpdated |= updateParamIfScalarChanged (info.stepCount, newStepCount);
+            anyUpdated |= updateParamIfScalarChanged (info.defaultNormalizedValue, (double) param.getDefaultValue());
+
+            jassert (0 <= info.defaultNormalizedValue && info.defaultNormalizedValue <= 1.0);
 
             return anyUpdated;
         }
@@ -1031,7 +1047,7 @@ public:
    #endif
 
     //==============================================================================
-    tresult PLUGIN_API setComponentState (IBStream* stream) override
+    tresult PLUGIN_API setComponentState (IBStream*) override
     {
         // As an IEditController member, the host should only call this from the message thread.
         assertHostMessageThread();
@@ -1056,7 +1072,7 @@ public:
         if (auto* handler = getComponentHandler())
             handler->restartComponent (Vst::kParamValuesChanged);
 
-        return Vst::EditController::setComponentState (stream);
+        return kResultOk;
     }
 
     void setAudioProcessor (JuceAudioProcessor* audioProc)
@@ -1324,7 +1340,7 @@ public:
         {
             for (int32 i = 0; i < parameters.getParameterCount(); ++i)
                 if (auto* param = dynamic_cast<Param*> (parameters.getParameterByIndex (i)))
-                    if (param->updateParameterInfo() && (flags & Vst::kParamTitlesChanged) == 0)
+                    if (param->updateParameterInfo())
                         flags |= Vst::kParamTitlesChanged;
         }
 
@@ -1731,7 +1747,8 @@ private:
 
     //==============================================================================
     class JuceVST3Editor final : public Vst::EditorView,
-                                 public Steinberg::IPlugViewContentScaleSupport,
+                                 public Vst::IParameterFinder,
+                                 public IPlugViewContentScaleSupport,
                                  private Timer
     {
     public:
@@ -1748,9 +1765,14 @@ private:
            #endif
         }
 
+        ~JuceVST3Editor() override = default; // NOLINT
+
         tresult PLUGIN_API queryInterface (const TUID targetIID, void** obj) override
         {
-            const auto result = testFor (*this, targetIID, UniqueBase<IPlugViewContentScaleSupport>{});
+            const auto result = testForMultiple (*this,
+                                                 targetIID,
+                                                 UniqueBase<Vst::IParameterFinder>{},
+                                                 UniqueBase<IPlugViewContentScaleSupport>{});
 
             if (result.isOk())
                 return result.extract (obj);
@@ -1758,7 +1780,9 @@ private:
             return Vst::EditorView::queryInterface (targetIID, obj);
         }
 
+        // NOLINTBEGIN
         REFCOUNT_METHODS (Vst::EditorView)
+        // NOLINTEND
 
         //==============================================================================
         tresult PLUGIN_API isPlatformTypeSupported (FIDString type) override
@@ -2033,7 +2057,48 @@ private:
            #endif
         }
 
+        tresult PLUGIN_API findParameter (int32 xPos, int32 yPos, Vst::ParamID& resultTag) override
+        {
+            if (const auto paramId = findParameterImpl (xPos, yPos))
+            {
+                resultTag = *paramId;
+                return kResultTrue;
+            }
+
+            return kResultFalse;
+        }
+
     private:
+        std::optional<Vst::ParamID> findParameterImpl (int32 xPos, int32 yPos) const
+        {
+            auto* wrapper = component.get();
+
+            if (wrapper == nullptr)
+                return {};
+
+            auto* componentAtPosition = wrapper->getComponentAt (xPos, yPos);
+
+            if (componentAtPosition == nullptr)
+                return {};
+
+            auto* editor = wrapper->pluginEditor.get();
+
+            if (editor == nullptr)
+                return {};
+
+            const auto parameterIndex = editor->getControlParameterIndex (*componentAtPosition);
+
+            if (parameterIndex < 0)
+                return {};
+
+            auto processor = owner->audioProcessor;
+
+            if (processor == nullptr)
+                return {};
+
+            return processor->getVSTParamIDForIndex (parameterIndex);
+        }
+
         void timerCallback() override
         {
             stopTimer();
