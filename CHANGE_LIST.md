@@ -3,6 +3,34 @@
 This file lists the more notable headline features. For more detailed info
 about changes and bugfixes please see the git log and BREAKING_CHANGES.md.
 
+## Version 8.0.1
+
+  - Fixed some issues with text layout
+  - Removed source code for unsupported platforms
+  - Fixed some Direct2D issues
+  - Update the embedded version of harfbuzz
+  - Added more surround formats
+
+## Version 8.0.0
+
+  - Added a new Direct2D renderer
+  - Added support for WebView based UIs
+  - Added consistent unicode support across platforms
+  - Added a new animation module
+  - Bundled the AAX SDK
+
+## Version 7.0.12
+
+  - Fixed an issue with timers in Pro Tools
+  - Fixed an issue with Projucer Xcode code signing
+
+## Version 7.0.11
+
+  - Fixed an issue with paths containing a tilde in Xcode
+  - Multiple fixes for plug-in deployment and code signing in Xcode
+  - Fixed an issue painting an empty RectangleList
+  - Improved the performance of TreeView rendering
+
 ## Version 7.0.10
 
   - Fixed multiple issues selecting devices in AudioDeviceSelector
