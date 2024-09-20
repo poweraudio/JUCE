@@ -1,6 +1,180 @@
 # JUCE breaking changes
 
+# develop
+
+## Change
+
+Font::getStringWidth and Font::getStringWidthFloat have been deprecated.
+Font::getGlyphPositions has been removed.
+
+**Possible Issues**
+
+Code that uses these functions will raise warnings at compile time, or fail
+to build.
+
+**Workaround**
+
+Use GlyphArrangement::getStringWidth or TextLayout::getStringWidth to find the
+width of a string taking font-fallback and shaping into account.
+
+To find individual glyph positions, lay out the string using GlyphArrangement
+or TextLayout, then use the positions provided by
+GlyphArrangement::PositionedGlyph and/or TextLayout::Glyph.
+
+**Rationale**
+
+The results of the old Font member functions computed their results assuming
+that ligatures and other font features would not be used when rendering the
+string. The functions would also substitute missing characters with the Font's
+notdef/tofu glyph instead of using a fallback font.
+
+Using GlyphArrangement or TextLayout will use a sophisticated text shaping
+algorithm to lay out the string, with support for font fallback.
+
+
+## Change
+
+The constructors of the WebSliderRelay, WebToggleButtonRelay and 
+WebComboBoxRelay classes were changed and they no longer accept a reference
+parameter to a WebBrowserComponent object.
+
+**Possible Issues**
+
+Code that uses these classes will fail to compile.
+
+**Workaround**
+
+Omit the WebBrowserComponent parameter when constructing the relay objects.
+
+**Rationale**
+
+The relay classes use a new underlying mechanism to obtain a pointer to the
+WebBrowserComponent object. When calling the
+WebBrowserComponent::Options::withOptionsFrom() function with the relay as a
+parameter, the corresponding WebBrowserComponent object will notify the relay
+about its creation and destruction.
+
+This avoids the anti-pattern where the relay class required a reference to a
+yet uninitialised WebBrowserComponent object.
+
+
+## Change
+
+The coefficients of LadderFilter::Mode::BPF12 have been changed, causing a
+slight change in the filter's transfer function.
+
+**Possible Issues**
+
+Code that uses the LadderFilter in BPF12 mode may produce different output
+samples.
+
+**Workaround**
+
+There is no workaround. If you need this functionality, please let us know
+about your use case. In the meantime, you may be able to copy the old class
+into your own project/module and use it that way.
+
+**Rationale**
+
+The LadderFilter implementation follows the paper Valimaki (2006): Oscillator
+and Filter Algorithms for Virtual Analog Synthesis. The BPF12 mode coefficients
+however contained a typo compared to the paper, making the BPF12 mode incorrect.
+
+
 # Version 8.0.1
+
+## Change
+
+All member functions of DynamicObject other than clone() and writeAsJSON() have
+been made non-virtual.
+
+**Possible Issues**
+
+Classes that override these functions will fail to compile.
+
+**Workaround**
+
+Instead of overriding hasMethod() and invokeMethod(), call setMethod() to
+add new member functions.
+
+Instead of overriding getProperty() to return a custom property, add that
+property using setProperty().
+
+**Rationale**
+
+Allowing the implementations of these functions to be changed may cause derived
+types to accidentally break the invariants of the DynamicObject type.
+Specifically, the results of hasMethod() and hasProperty() must be consistent
+with the result of getProperties(). Additiionally, calling getProperty() should
+return the same var as fetching the property through getProperties(), and
+calling invokeMethod() should behave the same way as retrieving and invoking a
+NativeFunction via getProperties().
+
+More concretely, the new QuickJS-based Javascript engine requires that all
+methods/properties are declared explicitly, which cannot be mapped to the more
+open-ended invokeMethod() API taking an arbitrary method name. Making
+invokeMethod() non-virtual forces users to add methods with setMethod() instead
+of overriding invokeMethod(), which is more compatible with QuickJS.
+
+
+## Change
+
+The default JSON encoding has changed from ASCII escape sequences to UTF-8.
+
+**Possible Issues**
+
+JSON text exchanged with a non-standard compliant parser expecting ASCII
+encoding, may fail to parse UTF-8 encoded JSON files. Reliance on the raw JSON
+encoded string literal, for example for file comparison, Base64 encoding, or any
+encryption, may result in false negatives for JSON data containing the same data
+between versions of JUCE.
+
+Note: JSON files that only ever encoded ASCII text will NOT be effected.
+
+**Workaround**
+
+Use the `JSON::writeToStream()` or `JSON::toString()` functions that take a
+`FormatOptions` parameter and call `withEncoding (JSON::Encoding::ascii)` on the
+`FormatOptions` object.
+
+**Rationale**
+
+RFC 8259 states
+
+> JSON text exchanged between systems that are not part of a closed ecosystem
+MUST be encoded using UTF-8 [RFC3629].
+>
+> Previous specifications of JSON have not required the use of UTF-8 when
+transmitting JSON text.  However, the vast majority of JSON-based software
+implementations have chosen to use the UTF-8 encoding, to the extent that it is
+the only encoding that achieves interoperability.
+
+For this reason UTF-8 encoding has better interoperability than ASCII escape
+sequences.
+
+
+## Change
+
+The ASCII and Unicode BEL character (U+0007) escape sequence has changed in the
+JSON encoder from "\a" to "\u0007".
+
+**Possible Issues**
+
+Reliance on the raw JSON encoded string literal, for example for file comparison,
+base-64 encoding, or any encryption, may result in false negatives for JSON data
+containing a BEL character between versions of JUCE.
+
+**Workaround**
+
+Use string replace, for example call `replace ("\\u007", "\\a")` on the
+resulting JSON string to match older versions of JUCE.
+
+**Rationale**
+
+The JSON specification does not state that the BEL character can be escaped
+using "\a". Therefore other JSON parsers incorrectly read this character when
+they encounter it.
+
 
 ## Change
 
@@ -19,7 +193,7 @@ into your own project/module and use them that way.
 **Rationale**
 
 We are not aware of any projects using this functionality. This renderer was
-not as fully-featured as any of the other renders, so it's likely that users
+not as fully-featured as any of the other renderers, so it's likely that users
 would have filed issue reports if they were using this feature.
 
 
@@ -460,14 +634,14 @@ implementation wrapping the QuickJS engine.
 **Possible Issues**
 
 Code that previously successfully evaluated using JavascriptEngine::evaluate()
-or JavascriptEngine::execute(), could now fail due to the rules applied by the 
-new, much more standards compliant engine. One example is object literals 
+or JavascriptEngine::execute(), could now fail due to the rules applied by the
+new, much more standards compliant engine. One example is object literals
 e.g. { a: 'foo', b: 42, c: {} }. When evaluated this way the new engine will
 assume that this is a code block and fail.
 
 **Workaround**
 
-When calling JavascriptEngine::evaluate() or JavascriptEngine::execute() the 
+When calling JavascriptEngine::evaluate() or JavascriptEngine::execute() the
 code may have to be updated to ensure that it's correct according to the
 Javascript language specification and in the context of that evaluation. Object
 literals standing on their own for example should be wrapped in parentheses

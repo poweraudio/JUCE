@@ -207,9 +207,9 @@ function(_juce_create_embedded_linux_subprocess_target output_target_name target
     get_target_property(generated_sources_directory ${target} JUCE_GENERATED_SOURCES_DIRECTORY)
 
     if(generated_sources_directory)
-        set(juce_linux_subprocess_helper_binary_dir "${generated_sources_directory}")
+        set(juce_linux_subprocess_helper_binary_dir "${generated_sources_directory}/$<CONFIG>/")
     else()
-        set(juce_linux_subprocess_helper_binary_dir "${CMAKE_CURRENT_BINARY_DIR}/juce_LinuxSubprocessHelper")
+        set(juce_linux_subprocess_helper_binary_dir "${CMAKE_CURRENT_BINARY_DIR}/juce_LinuxSubprocessHelper/$<CONFIG>/")
     endif()
 
     set(binary_header_file  "${juce_linux_subprocess_helper_binary_dir}/juce_LinuxSubprocessHelperBinaryData.h")
@@ -316,7 +316,14 @@ endfunction()
 function(_juce_append_record output key)
     string(ASCII 30 RS)
     string(ASCII 31 US)
-    set(${output} "${${output}}${key}${US}${ARGN}${RS}" PARENT_SCOPE)
+
+    set(prev)
+
+    if(DEFINED "${output}")
+        set(prev "${${output}}")
+    endif()
+
+    set(${output} "${prev}${key}${US}${ARGN}${RS}" PARENT_SCOPE)
 endfunction()
 
 function(_juce_append_target_property output key target property)
@@ -682,7 +689,10 @@ function(_juce_add_xcode_entitlements source_target dest_target)
 
     _juce_execute_juceaide(entitlements "${juce_kind_string}" "${input_info_file}" "${entitlements_file}")
     set_target_properties(${dest_target} PROPERTIES
-        XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS "${entitlements_file}")
+        XCODE_ATTRIBUTE_CODE_SIGN_ENTITLEMENTS
+        "${entitlements_file}"
+        XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME
+        "$<TARGET_PROPERTY:${source_target},JUCE_HARDENED_RUNTIME_ENABLED>")
 endfunction()
 
 function(_juce_configure_bundle source_target dest_target)
@@ -752,8 +762,6 @@ function(_juce_configure_bundle source_target dest_target)
     endif()
 
     set_target_properties(${dest_target} PROPERTIES
-        XCODE_ATTRIBUTE_ENABLE_HARDENED_RUNTIME
-            "$<TARGET_PROPERTY:${source_target},JUCE_HARDENED_RUNTIME_ENABLED>"
         XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY
             "$<TARGET_PROPERTY:${source_target},JUCE_TARGETED_DEVICE_FAMILY>")
 
@@ -2081,11 +2089,28 @@ function(juce_add_console_app target)
         target_compile_definitions(${target} PRIVATE _CONSOLE=1)
     endif()
 
+    # When building for iOS, these properties will be read in order to populate
+    # a plist for the app. We probably don't care whether these values are sane;
+    # if we wanted to run on iOS, we'd use juce_gui_app instead.
+    # We clear these explicitly to avoid warnings when configuring with
+    # --warn-uninitialized
+    set_target_properties(${target} PROPERTIES
+        MACOSX_BUNDLE_BUNDLE_NAME           ""
+        MACOSX_BUNDLE_BUNDLE_VERSION        ""
+        MACOSX_BUNDLE_COPYRIGHT             ""
+        MACOSX_BUNDLE_GUI_IDENTIFIER        ""
+        MACOSX_BUNDLE_ICON_FILE             ""
+        MACOSX_BUNDLE_INFO_STRING           ""
+        MACOSX_BUNDLE_LONG_VERSION_STRING   ""
+        MACOSX_BUNDLE_SHORT_VERSION_STRING  "")
+
     _juce_initialise_target(${target} ${ARGN})
 
     if(NOT JUCE_ARG__NO_RESOURCERC)
+        set_target_properties(${target} PROPERTIES JUCE_TARGET_KIND_STRING "ConsoleApp")
         _juce_write_configure_time_info(${target})
         _juce_add_resources_rc(${target} ${target})
+        _juce_add_xcode_entitlements(${target} ${target})
     endif()
 endfunction()
 

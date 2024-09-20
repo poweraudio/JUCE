@@ -52,6 +52,7 @@
 //==============================================================================
 #if JUCE_MAC
  #import <QuartzCore/QuartzCore.h>
+ #include <CoreImage/CIRenderDestination.h>
  #include <CoreText/CTFont.h>
 
 #elif JUCE_WINDOWS
@@ -140,6 +141,11 @@
 
 #include <juce_graphics/fonts/harfbuzz/hb-ot.h>
 
+extern "C"
+{
+#include <juce_graphics/unicode/sheenbidi/Headers/SheenBidi.h>
+} // extern "C"
+
 #if JUCE_UNIT_TESTS
  #include "fonts/juce_TypefaceTestData.cpp"
 #endif
@@ -152,7 +158,6 @@
 #include "unicode/juce_UnicodeUtils.cpp"
 #include "unicode/juce_UnicodeLine.cpp"
 #include "unicode/juce_UnicodeScript.cpp"
-#include "unicode/juce_UnicodeBrackets.cpp"
 #include "unicode/juce_UnicodeBidi.cpp"
 #include "unicode/juce_Unicode.cpp"
 #include "colour/juce_Colour.cpp"
@@ -204,15 +209,19 @@
  #include "native/juce_IconHelpers_mac.cpp"
 
 #elif JUCE_WINDOWS
+ #include "native/juce_Direct2DMetrics_windows.h"
+ #include "native/juce_Direct2DGraphicsContext_windows.h"
+ #include "native/juce_Direct2DHwndContext_windows.h"
  #include "native/juce_DirectX_windows.h"
+ #include "native/juce_Direct2DImage_windows.h"
+ #include "native/juce_Direct2DImageContext_windows.h"
+
  #include "native/juce_DirectWriteTypeface_windows.cpp"
  #include "native/juce_IconHelpers_windows.cpp"
  #include "native/juce_Direct2DHelpers_windows.cpp"
  #include "native/juce_Direct2DResources_windows.cpp"
- #include "native/juce_Direct2DImage_windows.h"
  #include "native/juce_Direct2DGraphicsContext_windows.cpp"
  #include "native/juce_Direct2DHwndContext_windows.cpp"
- #include "native/juce_Direct2DImageContext_windows.h"
  #include "native/juce_Direct2DImageContext_windows.cpp"
  #include "native/juce_Direct2DImage_windows.cpp"
  #include "native/juce_Direct2DMetrics_windows.cpp"
