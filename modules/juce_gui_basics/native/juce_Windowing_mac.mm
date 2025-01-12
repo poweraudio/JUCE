@@ -424,11 +424,9 @@ struct DisplaySettingsChangeCallback final : private DeletedAtShutdown
 
     std::function<void()> forceDisplayUpdate;
 
-    JUCE_DECLARE_SINGLETON (DisplaySettingsChangeCallback, false)
+    JUCE_DECLARE_SINGLETON_INLINE (DisplaySettingsChangeCallback, false)
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (DisplaySettingsChangeCallback)
 };
-
-JUCE_IMPLEMENT_SINGLETON (DisplaySettingsChangeCallback)
 
 static Rectangle<int> convertDisplayRect (NSRect r, CGFloat mainScreenBottom)
 {
@@ -455,7 +453,7 @@ static Displays::Display getDisplayFromScreen (NSScreen* s, CGFloat& mainScreenB
     NSSize dpi = [[[s deviceDescription] objectForKey: NSDeviceResolution] sizeValue];
     d.dpi = (dpi.width + dpi.height) / 2.0;
 
-   #if defined (MAC_OS_VERSION_12_0) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_12_0
+   #if JUCE_MAC_API_VERSION_CAN_BE_BUILT (12, 0)
     if (@available (macOS 12.0, *))
     {
         const auto safeInsets = [s safeAreaInsets];
@@ -533,7 +531,7 @@ static Image createNSWindowSnapshot (NSWindow* nsWindow)
             return image;
         };
 
-       #if defined (MAC_OS_VERSION_14_4) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_VERSION_14_4
+       #if JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)
 
         if (dlopen ("/System/Library/Frameworks/ScreenCaptureKit.framework/ScreenCaptureKit", RTLD_LAZY) == nullptr)
         {
@@ -605,12 +603,12 @@ static Image createNSWindowSnapshot (NSWindow* nsWindow)
 
        #else
 
-        JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wdeprecated-declarations")
+        JUCE_BEGIN_IGNORE_DEPRECATION_WARNINGS
         return createImageFromCGImage ((CGImageRef) CFAutorelease (CGWindowListCreateImage (CGRectNull,
                                                                                             kCGWindowListOptionIncludingWindow,
                                                                                             (CGWindowID) [nsWindow windowNumber],
                                                                                             kCGWindowImageBoundsIgnoreFraming)));
-        JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+        JUCE_END_IGNORE_DEPRECATION_WARNINGS
 
        #endif
     }

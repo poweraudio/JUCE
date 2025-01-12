@@ -70,15 +70,13 @@
  #import <IOKit/pwr_mgt/IOPMLib.h>
  #import <MetalKit/MetalKit.h>
 
- #if defined (MAC_OS_VERSION_14_4) && MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_VERSION_14_4
+ #if JUCE_MAC_API_VERSION_MIN_REQUIRED_AT_LEAST (14, 4)
   #import <ScreenCaptureKit/ScreenCaptureKit.h>
  #endif
 
 #elif JUCE_IOS
- #if JUCE_PUSH_NOTIFICATIONS
-  #import <UserNotifications/UserNotifications.h>
- #endif
-
+ #import <UserNotifications/UserNotifications.h>
+ #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
  #import <MetalKit/MetalKit.h>
  #import <UIKit/UIActivityViewController.h>
 

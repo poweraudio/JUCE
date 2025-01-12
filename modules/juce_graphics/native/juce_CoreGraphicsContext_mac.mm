@@ -104,7 +104,7 @@ public:
     //==============================================================================
     static CGImageRef getCachedImageRef (const Image& juceImage, CGColorSpaceRef colourSpace)
     {
-        auto cgim = dynamic_cast<CoreGraphicsPixelData*> (juceImage.getPixelData());
+        auto cgim = dynamic_cast<CoreGraphicsPixelData*> (juceImage.getPixelData().get());
 
         if (cgim != nullptr && cgim->cachedImageRef != nullptr)
             return CGImageRetain (cgim->cachedImageRef.get());
@@ -123,7 +123,7 @@ public:
 
         const auto provider = [&]
         {
-            if (auto* cgim = dynamic_cast<CoreGraphicsPixelData*> (juceImage.getPixelData()))
+            if (auto* cgim = dynamic_cast<CoreGraphicsPixelData*> (juceImage.getPixelData().get()))
             {
                 return detail::DataProviderPtr { CGDataProviderCreateWithData (new ImageDataContainer::Ptr (cgim->imageData),
                                                                                srcData.data,
@@ -638,7 +638,10 @@ void CoreGraphicsContext::drawRoundedRectangle (const Rectangle<float>& r, float
         CGContextSetLineCap (context.get(), kCGLineCapButt);
         CGContextSetLineJoin (context.get(), kCGLineJoinMiter);
 
-        detail::PathPtr path { CGPathCreateWithRoundedRect (convertToCGRectFlipped (r), cornerSize, cornerSize, nullptr) };
+        detail::PathPtr path { CGPathCreateWithRoundedRect (convertToCGRectFlipped (r),
+                                                            std::clamp (cornerSize, 0.0f, r.getWidth() / 2.0f),
+                                                            std::clamp (cornerSize, 0.0f, r.getHeight() / 2.0f),
+                                                            nullptr) };
         CGContextAddPath (context.get(), path.get());
         drawCurrentPath (kCGPathStroke);
     }
@@ -669,7 +672,10 @@ void CoreGraphicsContext::drawRoundedRectangle (const Rectangle<float>& r, float
 void CoreGraphicsContext::fillRoundedRectangle (const Rectangle<float>& r, float cornerSize)
 {
     CGContextBeginPath (context.get());
-    detail::PathPtr path { CGPathCreateWithRoundedRect (convertToCGRectFlipped (r), cornerSize, cornerSize, nullptr) };
+    detail::PathPtr path { CGPathCreateWithRoundedRect (convertToCGRectFlipped (r),
+                                                        std::clamp (cornerSize, 0.0f, r.getWidth() / 2.0f),
+                                                        std::clamp (cornerSize, 0.0f, r.getHeight() / 2.0f),
+                                                        nullptr) };
     CGContextAddPath (context.get(), path.get());
     drawCurrentPath (kCGPathFill);
 }
@@ -817,6 +823,11 @@ void CoreGraphicsContext::drawGlyphs (Span<const uint16_t> glyphs,
 {
     jassert (glyphs.size() == positions.size());
 
+    // This is an optimisation to avoid mutating the CGContext in the case that there's nothing
+    // to draw
+    if (positions.empty())
+        return;
+
     if (state->fillType.isColour())
     {
         const auto scale = state->font.getHorizontalScale();
@@ -830,16 +841,22 @@ void CoreGraphicsContext::drawGlyphs (Span<const uint16_t> glyphs,
             const auto slant = hb_font_get_synthetic_slant (hbFont.get());
 
             state->textMatrix = CGAffineTransformMake (scale, 0, slant * scale, 1.0f, 0, 0);
-            CGContextSetTextMatrix (context.get(), state->textMatrix);
             state->inverseTextMatrix = CGAffineTransformInvert (state->textMatrix);
         }
+
+        // The current text matrix needs to be adjusted in order to ensure that the requested
+        // positions aren't changed
+        CGContextSetTextMatrix (context.get(), state->textMatrix);
 
         ScopedCGContextState scopedState (context.get());
         flip();
         applyTransform (AffineTransform::scale (1.0f, -1.0f).followedBy (transform));
 
         CopyableHeapBlock<CGPoint> pos (glyphs.size());
-        std::transform (positions.begin(), positions.end(), pos.begin(), [scale] (const auto& p) { return CGPointMake (p.x / scale, -p.y); });
+        std::transform (positions.begin(), positions.end(), pos.begin(), [this] (const auto& p)
+        {
+            return CGPointApplyAffineTransform (CGPointMake (p.x, -p.y), state->inverseTextMatrix);
+        });
 
         CTFontDrawGlyphs (state->fontRef.get(), glyphs.data(), pos.data(), glyphs.size(), context.get());
         return;
@@ -850,6 +867,10 @@ void CoreGraphicsContext::drawGlyphs (Span<const uint16_t> glyphs,
         Path p;
         auto& f = state->font;
         f.getTypefacePtr()->getOutlineForGlyph (f.getMetricsKind(), glyph, p);
+
+        if (p.isEmpty())
+            continue;
+
         const auto scale = f.getHeight();
         fillPath (p, AffineTransform::scale (scale * f.getHorizontalScale(), scale).translated (positions[index]).followedBy (transform));
     }
@@ -1012,7 +1033,7 @@ Image juce_loadWithCoreImage (InputStream& input)
                                                        (int) CGImageGetHeight (loadedImage),
                                                        hasAlphaChan));
 
-                auto cgImage = dynamic_cast<CoreGraphicsPixelData*> (image.getPixelData());
+                auto cgImage = dynamic_cast<CoreGraphicsPixelData*> (image.getPixelData().get());
                 jassert (cgImage != nullptr); // if USE_COREGRAPHICS_RENDERING is set, the CoreGraphicsPixelData class should have been used.
 
                 CGContextDrawImage (cgImage->context.get(), convertToCGRect (image.getBounds()), loadedImage);
@@ -1049,7 +1070,7 @@ CGImageRef juce_createCoreGraphicsImage (const Image& juceImage, CGColorSpaceRef
 
 CGContextRef juce_getImageContext (const Image& image)
 {
-    if (auto cgi = dynamic_cast<CoreGraphicsPixelData*> (image.getPixelData()))
+    if (auto cgi = dynamic_cast<CoreGraphicsPixelData*> (image.getPixelData().get()))
         return cgi->context.get();
 
     jassertfalse;
